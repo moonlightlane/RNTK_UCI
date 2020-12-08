@@ -3,7 +3,9 @@ This is an efficient GPU implementation of recurrent neural tangent kernel (RNTK
 
 ## dependencies
 jax
+
 symjax
+
 sklearn
 
 ## reproduce results
