@@ -80,7 +80,7 @@ param['L'] = L
 for lf in Lf:
     param['Lf'] = lf
     print ('*********************','Lf:',param['Lf'],'L',L)
-    f = RNTK_avg.RNTK_function(n_total,d,param)
+    f = RNTK_avg.RNTK(n_total,d,param).RNTK_function()
     for flip in Flip:
        if flip == 2:
           Kb0 = np.array(f(tools.Augdata(X,0)),dtype = object)
