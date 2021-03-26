@@ -42,15 +42,12 @@ Average = args.avg
 Lf = args.Lf
 
 
-datasets = []
-for i in map(lambda x : x.split(), open("data/datasets.txt", "r").readlines()):
-    datasets.append(i[0])
+datasets = [i[0] for i in map(lambda x : x.split(), open("data/datasets.txt", "r").readlines())]
 dataset = datasets[dataset_id]
 
 
-dic = dict()
-for k, v in map(lambda x : x.split(), open("data" + "/" + dataset + "/" + dataset + ".txt", "r").readlines()):
-    dic[k] = v
+dic = {k:v for k,v in map(lambda x : x.split(), open("data" + "/" + dataset + "/" + dataset + ".txt", "r").readlines())}
+
 n_class = int(dic["n_clases="])
 d = int(dic["n_entradas="])
 n_train = int(dic["n_patrons_entrena="])
@@ -102,11 +99,11 @@ for lf in Lf:
              'su': su,
              'sb': sb,
              'sh': sh,
-             'c' : cost,
+             'c' : cost, #special
              'L': L,
              'Lf':lf,
              'flip': flip,
-             'acc': acc,
+             'acc': acc, #special
              'avg':avg
                 }
             print ('RNTK*********** data set:', dataset, ' sw:', sw,' su:',su,' sb:',sb,' sh:',sh,'L', L,'Lf', lf,'flip:',flip,'average:',avg ,'cost:', np.log10(cost), 'acc', np.round(100*acc,2), '************')
