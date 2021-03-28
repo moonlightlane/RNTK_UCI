@@ -106,7 +106,7 @@ for lf in Lf:
              'acc': acc, #special
              'avg':avg
                 }
-            print ('RNTK*********** data set:', dataset, ' sw:', sw,' su:',su,' sb:',sb,' sh:',sh,'L', L,'Lf', lf,'flip:',flip,'average:',avg ,'cost:', np.log10(cost), 'acc', np.round(100*acc,2), '************')
+            # print ('RNTK*********** data set:', dataset, ' sw:', sw,' su:',su,' sb:',sb,' sh:',sh,'L', L,'Lf', lf,'flip:',flip,'average:',avg ,'cost:', np.log10(cost), 'acc', np.round(100*acc,2), '************')
             with open(os.path.join(path_to_log,'UCI-rntk-dataset_{}-sw_{}-su_{}-sb_{}-sh_{}-L_{}-Lf_{}-flip_{}-avg_{}-c_{}'.format(
                     dataset, sw, su, sb, sh, L, lf,flip,avg,cost)),'w') as file:
                 file.write(json.dumps(result))

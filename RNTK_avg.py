@@ -27,10 +27,13 @@ class RNTK():
     def RNTK_first(self,x): # alg 1, line 1
         X = x*x[:, None]
         n = X.shape[0] #       // creates a diagonal matrix of sh^2 * sw^2
-        gp_new = T.expand_dims(self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + (self.su ** 2) * X + self.sb ** 2, axis = 0) # line 2, alg 1
+        test = self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + (self.su ** 2) * X + self.sb ** 2
+        print("test", test)
+        gp_new = T.expand_dims(test, axis = 0) # line 2, alg 1
         rntk_new = gp_new
         for l in range(self.L-1): #line 3, alg 1
             l = l+1
+            print("gp_new", gp_new[l-1])
             S_new,D_new = self.VT(gp_new[l-1]) 
             gp_new = T.concatenate([gp_new,T.expand_dims(self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + self.su**2 * S_new + self.sb**2,axis = 0)]) #line 4, alg 1
             rntk_new = T.concatenate([rntk_new,T.expand_dims(gp_new[l] + (self.Lf <= (l-1))*self.su**2*rntk_new[l-1]*D_new,axis = 0)])
