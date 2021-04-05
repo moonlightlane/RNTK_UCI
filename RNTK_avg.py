@@ -28,7 +28,6 @@ class RNTK():
         X = x*x[:, None]
         n = X.shape[0] #       // creates a diagonal matrix of sh^2 * sw^2
         test = self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + (self.su ** 2) * X + self.sb ** 2
-        print("test", test)
         gp_new = T.expand_dims(test, axis = 0) # line 2, alg 1
         rntk_new = gp_new
         for l in range(self.L-1): #line 3, alg 1
