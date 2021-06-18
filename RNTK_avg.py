@@ -28,7 +28,7 @@ class RNTK():
         X = x*x[:, None]
         n = X.shape[0] #       // creates a diagonal matrix of sh^2 * sw^2
         test = self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + (self.su ** 2) * X + self.sb ** 2
-        gp_new = T.expand_dims(test, axis = 0) # line 2, alg 1
+        gp_new = T.expand_dims(test, axis = 0) # line 2, alg 1 #GP IS GAMMA, RNTK IS PHI
         rntk_new = gp_new
         for l in range(self.L-1): #line 3, alg 1
             l = l+1
@@ -50,8 +50,8 @@ class RNTK():
         if self.Lf == 0: # if none of the katers are fixed, use the standard
             rntk_new = T.expand_dims(gp_new[0] + self.sw**2*rntk_old[0]*D_old,axis = 0)
         else:
-            rntk_new = T.expand_dims(gp_new[0],axis = 0) # WHY I DONT GET IT
-        for l in range(self.L-1):
+            rntk_new = T.expand_dims(gp_new[0],axis = 0) 
+        for l in range(self.L-1): #line 10
             l = l+1
             S_new,D_new = self.VT(gp_new[l-1]) # l-1, t
             S_old,D_old = self.VT(gp_old[l]) # t-1, l
