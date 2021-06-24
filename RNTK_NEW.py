@@ -4,70 +4,17 @@ import symjax
 import symjax.tensor as T
 
 class RNTK():
-    def __init__(self, N, length, param):
-        self.sw = param['sigmaw']
-        self.su = param['sigmau']
-        self.sb = param['sigmab']
-        self.sh = param['sigmah']
-        self.L = param['L']
-        self.Lf = param['Lf']
-        self.sv = param['sigmav']
-        self.N = N
-        self.length = length
-
-    def RNTK_function(self):
-        print(f"N, {self.N}, length, {self.length}")
-        DATA = T.Placeholder((self.N, self.length), 'float32')
-        RNTK,GP = self.RNTK_first(DATA[:,0])
-        v, _ = T.scan(lambda a,b:self.RNTK_middle(a,b),sequences=[ T.transpose(DATA[:, 1:]) ], init=T.stack([RNTK,GP]))
-        RNTK_last,RNTK_avg = self.RNTK_output(v)
-        f = symjax.function(DATA, outputs= [RNTK_last,RNTK_avg])
-        return f
-
-    def RNTK_first(self,x): # alg 1, line 1
-        X = x*x[:, None]
-        n = X.shape[0] #       // creates a diagonal matrix of sh^2 * sw^2
-        gp_new = T.expand_dims(self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + (self.su ** 2) * X + self.sb ** 2, axis = 0) # line 2, alg 1
-        rntk_new = gp_new
-        for l in range(self.L-1): #line 3, alg 1
-            l = l+1
-            S_new,D_new = self.VT(gp_new[l-1]) 
-            gp_new = T.concatenate([gp_new,T.expand_dims(self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + self.su**2 * S_new + self.sb**2,axis = 0)]) #line 4, alg 1
-            rntk_new = T.concatenate([rntk_new,T.expand_dims(gp_new[l] + (self.Lf <= (l-1))*self.su**2*rntk_new[l-1]*D_new,axis = 0)])
-        S_old,D_old = self.VT(gp_new[self.L-1])
-        gp_new = T.concatenate([gp_new,T.expand_dims(self.sv**2*S_old,axis = 0)]) #line 5, alg 1
-        rntk_new = T.concatenate([rntk_new,T.expand_dims(gp_new[self.L] + (self.Lf != self.L)*self.sv**2*rntk_new[self.L-1]*D_old,axis = 0)])
-        return rntk_new, gp_new
-
-    def RNTK_middle(self, previous,x): # line 7, alg 1
-        X = x * x[:, None] # <x, x^t>
-        rntk_old = previous[0]
-        gp_old = previous[1]
-        S_old,D_old = self.VT(gp_old[0])#.  //vv K(1,t-1)
-        gp_new = T.expand_dims(self.sw ** 2 * S_old + (self.su ** 2) * X + self.sb ** 2,axis = 0) # line 8, alg 1
-        if self.Lf == 0: # if none of the katers are fixed, use the standard
-            rntk_new = T.expand_dims(gp_new[0] + self.sw**2*rntk_old[0]*D_old,axis = 0)
-        else:
-            rntk_new = T.expand_dims(gp_new[0],axis = 0) # WHY I DONT GET IT
-        for l in range(self.L-1):
-            l = l+1
-            S_new,D_new = self.VT(gp_new[l-1]) # l-1, t
-            S_old,D_old = self.VT(gp_old[l]) # t-1, l
-            gp_new = T.concatenate( [gp_new, T.expand_dims( self.sw ** 2 * S_old + self.su ** 2 * S_new +  self.sb ** 2, axis = 0)]) #line 10
-            rntk_new = T.concatenate( [ rntk_new,  T.expand_dims( gp_new[l] +(self.Lf <= l)*self.sw**2*rntk_old[l]*D_old +(self.Lf <= (l-1))* self.su**2*rntk_new[l-1]*D_new  ,axis = 0)   ]  )
-        S_old,D_old = self.VT(gp_new[self.L-1])
-        gp_new = T.concatenate([gp_new,T.expand_dims(self.sv**2*S_old,axis = 0)]) # line 11
-        rntk_new = T.concatenate([rntk_new,T.expand_dims(rntk_old[self.L]+ gp_new[self.L] + (self.Lf != self.L)*self.sv**2*rntk_new[self.L-1]*D_old,axis = 0)])
-        return T.stack([rntk_new,gp_new]),x
-
-    def RNTK_output(self, previous):
-        rntk_old = previous[0]
-        gp_old = previous[1]
-        S_old,D_old = self.VT(gp_old[self.L-1])
-        RNTK_last  = self.sv**2*S_old + (self.Lf != self.L)*self.sv**2*rntk_old[self.L-1]*D_old 
-        RNTK_avg =  (RNTK_last + rntk_old[self.L])/self.length
-        return RNTK_last,RNTK_avg
-
+    def __init__(self, dic):
+        self.sw = 1
+        self.su = 1
+        self.sb = 1
+        self.sh = 1
+        self.L = 1
+        self.Lf = 0
+        self.sv = 1
+        self.N = int(dic["n_patrons1="])
+        self.length = int(dic["n_entradas="])
+        
     def VT(self, M):
         A = T.diag(M)  # GP_old is in R^{n*n} having the output gp kernel
         # of all pairs of data in the data set
@@ -78,3 +25,78 @@ class RNTK():
         F = (1 / (2 * np.pi)) * (E * (np.pi - T.arccos(E)) + T.sqrt(1 - E ** 2)) * C
         G = (np.pi - T.arccos(E)) / (2 * np.pi)
         return F,G
+
+def make_inputs(dim_1, dim_2, dim1idx, dim2idx, n):
+    diagindex = jax.numpy.arange(0,min(dim_1, dim_2) - (dim1idx + dim2idx))
+    diag = T.Variable((diagindex), "float32", "dimension internal index")
+    dim1ph = T.Variable(dim_1, "float32", "dimension 1 max")
+    dim2ph = T.Variable(dim_2, "float32", "dimension 2 max")
+    dim1idxph = T.Variable(dim1idx, "float32", "dimension 1 index")
+    dim2idxph = T.Variable(dim2idx, "float32", "dimension 2 index")
+    nph = T.Variable(n, "float32", "n")
+    return diag, dim1ph, dim2ph, dim1idxph, dim2idxph, nph
+
+def create_func_for_diag(rntk, dim_1, dim_2, dim1idx, dim2idx, n, function = False):
+    diag, dim1ph, dim2ph, dim1idxph, dim2idxph, nph = make_inputs(dim_1, dim_2, dim1idx, dim2idx, n)
+
+    ## prev_vals - (2,1) - previous phi and lambda values
+    ## idx - where we are on the diagonal
+    ## d1idx - y value of first dimension diag start
+    ## d2idx - x value of second dimension diag start
+    ## d1ph - max value of first dimension
+    ## d2ph - max value of second dimension
+    bc = rntk.sh ** 2 * rntk.sw ** 2 * T.eye(n, n) + (rntk.su ** 2) + rntk.sb ** 2 ## took out an X
+    single_boundary_condition = T.expand_dims(T.Variable((bc), "float32", "boundary_condition"), axis = 0)
+    boundary_condition = T.concatenate([single_boundary_condition, single_boundary_condition])
+
+    def fn(prev_vals, idx, d1ph, d2ph, d1idx, d2idx, nph):
+        # tiprime_iter = d1idx + idx
+        # ti_iter = d2idx + idx
+        prev_lambda = prev_vals[0]
+        prev_phi = prev_vals[1]
+        ## not boundary condition
+        S, D = rntk.VT(prev_lambda)
+        new_lambda = rntk.sw ** 2 * S + rntk.su ** 2 + rntk.sb ** 2 ## took out an X
+        new_phi = new_lambda + rntk.sw ** 2 * prev_phi * D
+        lambda_expanded = T.expand_dims(new_lambda, axis = 0)
+        phi_expanded = T.expand_dims(new_phi, axis = 0)
+        to_return = T.concatenate([lambda_expanded, phi_expanded])
+        
+        return to_return, to_return
+
+    last_ema, all_ema = T.scan(
+        fn, init = boundary_condition, sequences=[diag], non_sequences=[dim1ph, dim2ph, dim1idxph, dim2idxph,  nph]
+    )
+
+    expanded_ema = T.concatenate([T.expand_dims(boundary_condition, axis = 0), all_ema])
+    if function: 
+        f = symjax.function(diag, dim1ph, dim2ph, dim1idxph, dim2idxph, nph, outputs=expanded_ema)
+        return f
+    else:
+        return expanded_ema
+
+def diag_func_wrapper(rntk, dim_1, dim_2, dim_1_idx, dim_2_idx, n, fbool = False):
+    f = create_func_for_diag(rntk, dim_1, dim_2, dim_1_idx, dim_2_idx, n, function = fbool)
+    if fbool:
+        return f(np.arange(0,min(dim_1, dim_2) - (dim_1_idx + dim_2_idx)), dim_1, dim_2, dim_1_idx, dim_2_idx, n)
+    return f
+
+def index_func(whic, dim_1, dim_2):
+    dim = min(dim_1, dim_2)
+    return sum([(dim + 1)-np.abs(i-dim) for i in range(0, whic)])
+
+def arrays_to_diag(array_of_diags, dim_1, dim_2):
+    full_lambda = []
+    full_phi = []
+    for i in range(0,dim_1 + 1): #these are rows
+        column_lambda = []
+        column_phi = []
+        for j in range(0,dim_2 + 1): #these are columns
+            list_index = min(dim_2-i, j) #could be dim 1
+            which_list = j + i
+            new_list_idx = list_index + index_func(which_list, dim_1, dim_2)
+            column_lambda.append(array_of_diags[new_list_idx][0])
+            column_phi.append(array_of_diags[new_list_idx][1])
+        full_lambda.append(column_lambda)
+        full_phi.append(column_phi)
+    return np.array(full_lambda), np.array(full_phi)
