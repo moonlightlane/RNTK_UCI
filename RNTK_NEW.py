@@ -4,7 +4,7 @@ import symjax
 import symjax.tensor as T
 
 class RNTK():
-    def __init__(self, dic, dim_1, dim_2, n):
+    def __init__(self, dic, dim_1, dim_2, X, n):
         self.dim_1 = dim_1
         self.dim_2 = dim_2
         self.sw = 1
@@ -14,6 +14,7 @@ class RNTK():
         self.L = 1
         self.Lf = 0
         self.sv = 1
+        self.X = X
         self.n = n
         self.N = int(dic["n_patrons1="])
         self.length = int(dic["n_entradas="])
@@ -76,16 +77,16 @@ class RNTK():
         ## d2ph - max value of second dimension
         bc = self.sh ** 2 * self.sw ** 2 * T.eye(self.n, self.n) + (self.su ** 2) + self.sb ** 2 ## took out an X
         single_boundary_condition = T.expand_dims(T.Variable((bc), "float32", "boundary_condition"), axis = 0)
-        boundary_condition = T.concatenate([single_boundary_condition, single_boundary_condition])
+        boundary_condition = T.concatenate([single_boundary_condition, single_boundary_condition]) #one for phi and lambda
 
-        def fn(prev_vals, idx, d1ph, d2ph, d1idx, d2idx, nph):
+        def fn(prev_vals, idx, Xph):
             # tiprime_iter = d1idx + idx
             # ti_iter = d2idx + idx
             prev_lambda = prev_vals[0]
             prev_phi = prev_vals[1]
             ## not boundary condition
             S, D = self.VT(prev_lambda)
-            new_lambda = self.sw ** 2 * S + self.su ** 2 + self.sb ** 2 ## took out an X
+            new_lambda = self.sw ** 2 * S + self.su ** 2 * Xph + self.sb ** 2 ## took out an X
             new_phi = new_lambda + self.sw ** 2 * prev_phi * D
             lambda_expanded = T.expand_dims(new_lambda, axis = 0)
             phi_expanded = T.expand_dims(new_phi, axis = 0)
@@ -94,7 +95,7 @@ class RNTK():
             return to_return, to_return
 
         last_ema, all_ema = T.scan(
-            fn, init = boundary_condition, sequences=[diag], non_sequences=[dim1ph, dim2ph, dim1idxph, dim2idxph,  nph]
+            fn, init = boundary_condition, sequences=[diag], non_sequences=[self.X]
         )
 
         expanded_ema = T.concatenate([T.expand_dims(boundary_condition, axis = 0), all_ema])
