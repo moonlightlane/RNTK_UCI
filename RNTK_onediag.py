@@ -27,6 +27,10 @@ class RNTK():
         middle_list.fill(clip_num)
         self.dim_lengths = np.concatenate([np.arange(1,clip_num), middle_list, np.arange(clip_num, 0, -1)])
 
+        self.how_many_before = [sum(self.dim_lengths[:j]) for j in range(0, len(self.dim_lengths))]
+
+        length_betw = (self.dim_lengths - 1)[1:-1]
+        self.when_to_reset = np.array([sum(length_betw[:j]) for j in range(0, len(length_betw)+1)])[1:] - 1
 
     def get_diag_indices(self, jnpbool = False):
         switch_flag = 1
@@ -66,28 +70,16 @@ class RNTK():
         G = (np.pi - T.arccos(E)) / (2 * np.pi)
         return F,G
 
-    def make_inputs(self, dim1idx, dim2idx, jmode = False):
-        ## revelation - we dont actually need the diagonal number, just the length! This means we no longer need arange
-        # print("dim1idx", dim1idx)
-        test = jnp.min(jnp.array([self.dim_1, self.dim_2])) - (dim1idx + dim2idx)
-        # print("test", test)
-        return T.Placeholder((test, ), "int32")
+    def create_func_for_diag(self):
 
-    def create_func_for_diag(self, dim1idx, dim2idx, function = False, jmode = False):
-        diag = self.make_inputs(dim1idx, dim2idx, jmode = jmode)
-        # print('test')
+        bc = self.sh ** 2 * self.sw ** 2 * T.eye(self.n, self.n) + (self.su ** 2)* self.X + self.sb ** 2 ## took out X || 
+        single_boundary_condition = T.expand_dims(bc, axis = 0)
+        # single_boundary_condition = T.expand_dims(T.Variable((bc), "float32", "boundary_condition"), axis = 0)
+        boundary_condition = T.concatenate([single_boundary_condition, single_boundary_condition])
+        self.boundary_condition = boundary_condition
 
         ## prev_vals - (2,1) - previous phi and lambda values
         ## idx - where we are on the diagonal
-        ## d1idx - y value of first dimension diag start
-        ## d2idx - x value of second dimension diag start
-        ## d1ph - max value of first dimension
-        ## d2ph - max value of second dimension
-        bc = self.sh ** 2 * self.sw ** 2 * T.eye(self.n, self.n) + (self.su ** 2)* self.X + self.sb ** 2
-        single_boundary_condition = T.expand_dims(bc, axis = 0)
-        # single_boundary_condition = T.expand_dims(T.Variable((bc), "float32", "boundary_condition"), axis = 0)
-        boundary_condition = T.concatenate([single_boundary_condition, single_boundary_condition]) #one for phi and lambda
-
         def fn(prev_vals, idx, Xph):
             # tiprime_iter = d1idx + idx
             # ti_iter = d2idx + idx
@@ -99,23 +91,17 @@ class RNTK():
             new_phi = new_lambda + self.sw ** 2 * prev_phi * D
             lambda_expanded = T.expand_dims(new_lambda, axis = 0)
             phi_expanded = T.expand_dims(new_phi, axis = 0)
+
             to_return = T.concatenate([lambda_expanded, phi_expanded])
 
-            # jax.lax.cond(to_return.shape == (2,10,10), lambda _: print(f'{idx}, true'), lambda _: print(f'{idx}, false'), operand = None)
-            
+            if idx in self.when_to_reset:
+                return boundary_condition, to_return
             return to_return, to_return
-
+        
         last_ema, all_ema = T.scan(
-            fn, init = boundary_condition, sequences=[diag], non_sequences=[self.X]
+            fn, init =  boundary_condition, sequences=[jnp.arange(0, sum(self.dim_lengths) - self.dim_num)], non_sequences=[self.X]
         )
-
-        expanded_ema = T.concatenate([T.expand_dims(boundary_condition, axis = 0), all_ema])
-        print(expanded_ema) 
-        if function: 
-            f = symjax.function(diag, outputs=expanded_ema)
-            return f
-        else:
-            return expanded_ema
+        return all_ema
 
     def diag_func_wrapper(self, dim_1_idx, dim_2_idx, fbool = False, jmode = False):
         # print('tests')
@@ -125,10 +111,12 @@ class RNTK():
             return f(np.arange(0,min(self.dim_1, self.dim_2) - (dim_1_idx + dim_2_idx)), self.dim_1, self.dim_2, dim_1_idx, dim_2_idx, self.n)
         return f
 
-    def arrays_to_diag(self, array_of_diags):
+    def no_bc_arrays_to_diag(self, input_array):
 
-        how_many_before = [sum(self.dim_lengths[:j]) for j in range(0, len(self.dim_lengths))]
-        print(how_many_before)
+        indices_to_set = np.sort(list(set(range(0,int(sum(self.dim_lengths)))) - set(self.how_many_before)))
+        array_of_diags = np.zeros(int(sum(self.dim_lengths)), dtype = "object")
+        array_of_diags.fill(self.boundary_condition)
+        np.put(array_of_diags, indices_to_set, [input_array[i] for i in range(input_array.shape[0])])
 
         full_lambda = []
         full_phi = []
@@ -138,7 +126,7 @@ class RNTK():
             for j in range(0, self.dim_2 + 1): #these are columns
                 list_index = min(self.dim_1-i, j) #could be dim 1
                 which_list = j + i
-                new_list_idx = list_index + int(how_many_before[which_list])
+                new_list_idx = list_index + int(self.how_many_before[which_list])
                 column_lambda.append(array_of_diags[new_list_idx][0])
                 column_phi.append(array_of_diags[new_list_idx][1])
             full_lambda.append(column_lambda)
