@@ -3,7 +3,7 @@ gpu_id=0
 sigmaw=(1.4142)
 sigmau=(0.25 0.5)
 sigmab=(0.001 0.1)
-sigmah=(0.0)
+sigmah=(0.0) #0, -> 0.3 // should get 16 different kernels, get bidirectional for 32
 for dataset_id in {0..0}  #$dataset_ids # used to be 89
 do
   for sw in ${sigmaw[@]}
