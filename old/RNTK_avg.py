@@ -22,7 +22,7 @@ class RNTK():
         v, _ = T.scan(lambda a,b:self.RNTK_middle(a,b),sequences=[ T.transpose(DATA[:, 1:]) ], init=T.stack([RNTK,GP]))
         RNTK_last,RNTK_avg = self.RNTK_output(v)
         f = symjax.function(DATA, outputs= [RNTK_last,RNTK_avg])
-        return f
+        return RNTK_last,RNTK_avg
 
     def RNTK_first(self,x): # alg 1, line 1
         X = x*x[:, None]
@@ -30,6 +30,8 @@ class RNTK():
         test = self.sh ** 2 * self.sw ** 2 * T.eye(n, n) + (self.su ** 2) * X + self.sb ** 2
         gp_new = T.expand_dims(test, axis = 0) # line 2, alg 1 #GP IS GAMMA, RNTK IS PHI
         rntk_new = gp_new
+        print("gp_new 1", gp_new)
+        print("rntk_new 1", rntk_new)
         for l in range(self.L-1): #line 3, alg 1
             l = l+1
             print("gp_new", gp_new[l-1])
@@ -39,6 +41,8 @@ class RNTK():
         S_old,D_old = self.VT(gp_new[self.L-1])
         gp_new = T.concatenate([gp_new,T.expand_dims(self.sv**2*S_old,axis = 0)]) #line 5, alg 1
         rntk_new = T.concatenate([rntk_new,T.expand_dims(gp_new[self.L] + (self.Lf != self.L)*self.sv**2*rntk_new[self.L-1]*D_old,axis = 0)])
+        print("gp_new 2", gp_new)
+        print("rntk_new 2", rntk_new)
         return rntk_new, gp_new
 
     def RNTK_middle(self, previous,x): # line 7, alg 1
@@ -51,6 +55,10 @@ class RNTK():
             rntk_new = T.expand_dims(gp_new[0] + self.sw**2*rntk_old[0]*D_old,axis = 0)
         else:
             rntk_new = T.expand_dims(gp_new[0],axis = 0) 
+        
+        print("gp_new 3", gp_new)
+        print("rntk_new 3", rntk_new)
+
         for l in range(self.L-1): #line 10
             l = l+1
             S_new,D_new = self.VT(gp_new[l-1]) # l-1, t
@@ -60,6 +68,8 @@ class RNTK():
         S_old,D_old = self.VT(gp_new[self.L-1])
         gp_new = T.concatenate([gp_new,T.expand_dims(self.sv**2*S_old,axis = 0)]) # line 11
         rntk_new = T.concatenate([rntk_new,T.expand_dims(rntk_old[self.L]+ gp_new[self.L] + (self.Lf != self.L)*self.sv**2*rntk_new[self.L-1]*D_old,axis = 0)])
+        print("gp_new 4", gp_new)
+        print("rntk_new 4", rntk_new)
         return T.stack([rntk_new,gp_new]),x
 
     def RNTK_output(self, previous):
