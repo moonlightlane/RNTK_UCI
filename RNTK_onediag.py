@@ -70,7 +70,7 @@ class RNTK():
         G = (np.pi - T.arccos(E)) / (2 * np.pi)
         return F,G
 
-    def create_func_for_diag(self):
+    def create_func_for_diag(self, fbool = False):
 
         bc = self.sh ** 2 * self.sw ** 2 * T.eye(self.n, self.n) + (self.su ** 2)* self.X + self.sb ** 2 ## took out X || 
         single_boundary_condition = T.expand_dims(bc, axis = 0)
@@ -101,7 +101,11 @@ class RNTK():
         last_ema, all_ema = T.scan(
             fn, init =  boundary_condition, sequences=[jnp.arange(0, sum(self.dim_lengths) - self.dim_num)], non_sequences=[self.X]
         )
+        # if fbool:
+            
+        #     return all_ema, f
         return all_ema
+
 
     def diag_func_wrapper(self, dim_1_idx, dim_2_idx, fbool = False, jmode = False):
         # print('tests')
@@ -111,7 +115,39 @@ class RNTK():
             return f(np.arange(0,min(self.dim_1, self.dim_2) - (dim_1_idx + dim_2_idx)), self.dim_1, self.dim_2, dim_1_idx, dim_2_idx, self.n)
         return f
 
+    def add_or_create(self, tlist, titem):
+        if tlist is None:
+            return T.expand_dims(titem, axis = 0)
+        else:
+            return T.concatenate([tlist, T.expand_dims(titem, axis = 0)])
+
     def no_bc_arrays_to_diag(self, input_array):
+
+        indices_to_set = np.sort(list(set(range(0,int(sum(self.dim_lengths)))) - set(self.how_many_before)))
+        array_of_diags = np.zeros(int(sum(self.dim_lengths)), dtype = "object")
+        array_of_diags.fill(self.boundary_condition)
+        np.put(array_of_diags, indices_to_set, [input_array[i] for i in range(input_array.shape[0])])
+
+        full_lambda = None
+        full_phi = None
+        for i in range(0, self.dim_1 + 1): #these are rows
+            column_lambda = None
+            column_phi = None
+            for j in range(0, self.dim_2 + 1): #these are columns
+                list_index = min(self.dim_1-i, j) #could be dim 1
+                which_list = j + i
+                new_list_idx = list_index + int(self.how_many_before[which_list])
+                column_lambda = self.add_or_create(column_lambda, array_of_diags[new_list_idx][0])
+                column_phi = self.add_or_create(column_phi, array_of_diags[new_list_idx][1])
+                # column_lambda.append()
+                # column_phi.append(array_of_diags[new_list_idx][1])
+            full_lambda = self.add_or_create(full_lambda, column_lambda)
+            full_phi = self.add_or_create(full_phi, column_phi)
+            # full_lambda.append(column_lambda)
+            # full_phi.append(column_phi)
+        return full_lambda, full_phi
+
+    def old_no_bc_arrays_to_diag(self, input_array):
 
         indices_to_set = np.sort(list(set(range(0,int(sum(self.dim_lengths)))) - set(self.how_many_before)))
         array_of_diags = np.zeros(int(sum(self.dim_lengths)), dtype = "object")
