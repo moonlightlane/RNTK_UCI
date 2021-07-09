@@ -3,6 +3,25 @@ import jax
 import symjax
 import symjax.tensor as T
 import jax.numpy as jnp
+import time
+
+def create_func(dic, printbool = False):
+    N = int(dic["n_patrons1="])
+    length = int(dic["n_entradas="])
+    DATA = T.Placeholder((N, length), 'float32', name = "X")
+    x = DATA[:,0]
+    X = x*x[:, None]
+    n = X.shape[0]
+
+    rntkod = RNTK(dic, X, n) #could be flipped 
+
+    start = time.time()
+    lin_ema = rntkod.create_func_for_diag()
+    diag_func = symjax.function(DATA, outputs=lin_ema)
+    if printbool:
+        print("time to create symjax", time.time() - start)
+
+    return diag_func
 
 class RNTK():
     def __init__(self, dic, X, n, dim_1 = None, dim_2 = None):
